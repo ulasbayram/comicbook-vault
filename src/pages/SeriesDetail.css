@@ -1,0 +1,217 @@
+.series-detail {
+  padding-top: var(--space-6);
+  padding-bottom: var(--space-16);
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  padding: var(--space-2) 0;
+  margin-bottom: var(--space-6);
+  transition: color var(--transition-fast);
+}
+
+.back-link:hover {
+  color: var(--accent-secondary);
+}
+
+.series-hero {
+  display: flex;
+  gap: var(--space-8);
+  margin-bottom: var(--space-12);
+  opacity: 0;
+}
+
+.series-cover {
+  flex-shrink: 0;
+  width: 220px;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg), 0 0 40px rgba(0, 0, 0, 0.3);
+}
+
+.series-cover img {
+  width: 100%;
+  aspect-ratio: 2/3;
+  object-fit: cover;
+}
+
+.cover-placeholder {
+  width: 100%;
+  aspect-ratio: 2/3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-tertiary);
+  font-size: 4rem;
+}
+
+.series-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+}
+
+.series-title {
+  font-size: var(--font-size-3xl);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.series-description {
+  color: var(--text-secondary);
+  font-size: var(--font-size-base);
+  line-height: 1.7;
+  max-width: 600px;
+}
+
+.series-stats {
+  display: flex;
+  gap: var(--space-6);
+}
+
+.stat {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.stat strong {
+  color: var(--text-primary);
+  font-size: var(--font-size-xl);
+  margin-right: var(--space-1);
+}
+
+.series-actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.section-title {
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  margin-bottom: var(--space-6);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.issues-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.issue-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  opacity: 0;
+  cursor: pointer;
+}
+
+.issue-card:hover {
+  transform: translateX(4px);
+}
+
+.issue-number {
+  font-size: var(--font-size-2xl);
+  font-weight: 900;
+  color: var(--accent-secondary);
+  min-width: 60px;
+  text-align: center;
+}
+
+.issue-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.issue-title {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+}
+
+.issue-meta {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+.issue-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-1);
+}
+
+.progress-bar {
+  flex: 1;
+  height: 4px;
+  max-width: 120px;
+  background: var(--bg-primary);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent-gradient);
+  border-radius: 2px;
+  transition: width var(--transition-base);
+}
+
+.progress-text {
+  font-size: var(--font-size-xs);
+  color: var(--accent-secondary);
+  font-weight: 600;
+}
+
+.issue-arrow {
+  font-size: var(--font-size-lg);
+  color: var(--text-muted);
+  transition: all var(--transition-fast);
+}
+
+.issue-card:hover .issue-arrow {
+  color: var(--accent-secondary);
+  transform: translateX(4px);
+}
+
+.no-issues {
+  color: var(--text-secondary);
+  text-align: center;
+  padding: var(--space-8);
+}
+
+@media (max-width: 768px) {
+  .series-hero {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .series-cover {
+    width: 180px;
+  }
+
+  .series-info {
+    align-items: center;
+  }
+
+  .series-actions {
+    justify-content: center;
+  }
+
+  .series-title {
+    font-size: var(--font-size-2xl);
+  }
+}
