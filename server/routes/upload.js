@@ -137,11 +137,17 @@ async function extractCbrImages(cbrPath, outputDir) {
   try {
     // Try native 7zip first (much faster, uses no JS memory, gracefully handles solid archives via cleanroom RAR5)
     await execAsync(`7zz e -y "${cbrPath}" -o"${nativeExtractDir}/"`);
+  } catch (error) {
+    // 7zip often exits with a non-zero code (warning/error) due to metadata/junk files inside CBRs.
+    console.log('Native 7zip exited with error/warning, checking if files were extracted anyway:', error.message);
+  }
+
+  try {
     const paths = processExtractedFiles(nativeExtractDir, outputDir);
     if (paths.length > 0) return paths;
-  } catch (error) {
-    console.log('Native 7zip failed or not found, falling back to node-unrar-js...', error.message);
-  }
+  } catch (err) {}
+
+  console.log('Native 7zip extracted 0 images, falling back to node-unrar-js...');
 
   // Fallback to node-unrar-js
   const { createExtractorFromFile } = await import('node-unrar-js');
