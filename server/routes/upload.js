@@ -8,6 +8,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import crypto from 'crypto';
 import db from '../lib/db.js';
+import { authenticate } from '../middleware/auth.js';
 
 const IMAGES_DIR = path.join(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..'), 'data', 'images');
 fs.mkdirSync(IMAGES_DIR, { recursive: true });
@@ -148,7 +149,7 @@ function isDoubleSpread(width, height, medianRatio) {
   return (width / height) > medianRatio * 1.3;
 }
 
-router.post('/', upload.single('file'), async (req, res) => {
+router.post('/', authenticate, upload.single('file'), async (req, res) => {
   if (!req.isAdmin) {
     // Also clean up the temp file if not admin
     if (req.file?.path) fs.rmSync(req.file.path, { force: true });

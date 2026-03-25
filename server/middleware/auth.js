@@ -23,6 +23,7 @@ export function authenticate(req, res, next) {
   // Attach user ID and admin status to request
   req.userId = session.user_id;
   req.userEmail = session.email;
-  req.isAdmin = session.email === 'ulas.bayram8527@gmail.com';
+  const normalizedEmail = (session.email || '').toLowerCase().trim();
+  req.isAdmin = normalizedEmail === 'ulas.bayram8527@gmail.com';
   next();
 }

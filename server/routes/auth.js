@@ -65,7 +65,8 @@ router.post('/login', (req, res) => {
     const token = generateToken();
     db.prepare('INSERT INTO sessions (token, user_id) VALUES (?, ?)').run(token, user.id);
 
-    res.json({ token, user: { id: user.id, email, isAdmin: email === 'ulas.bayram8527@gmail.com' } });
+    const normalizedEmail = (email || '').toLowerCase().trim();
+    res.json({ token, user: { id: user.id, email, isAdmin: normalizedEmail === 'ulas.bayram8527@gmail.com' } });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Login failed' });
