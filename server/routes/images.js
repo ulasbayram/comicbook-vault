@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { getPresignedUrl, getPresignedUrls } from '../lib/r2.js';
 import supabase from '../lib/supabase.js';
 
 const router = Router();
@@ -19,13 +18,11 @@ router.get('/issue/:issueId', async (req, res) => {
     if (error) throw error;
     if (!pages?.length) return res.status(404).json({ error: 'No pages found' });
 
-    // Generate presigned URLs for all pages
-    const pagesWithUrls = await Promise.all(
-      pages.map(async (page) => ({
-        ...page,
-        image_url: await getPresignedUrl(page.image_key, 7200) // 2 hour expiry
-      }))
-    );
+    // Return local URLs for all pages
+    const pagesWithUrls = pages.map((page) => ({
+      ...page,
+      image_url: `/data/images/${page.image_key}`
+    }));
 
     res.json(pagesWithUrls);
   } catch (error) {
@@ -47,7 +44,7 @@ router.get('/cover/:seriesId', async (req, res) => {
       return res.status(404).json({ error: 'No cover found' });
     }
 
-    const url = await getPresignedUrl(series.cover_url, 86400); // 24 hour expiry
+    const url = `/data/images/${series.cover_url}`;
     res.json({ url });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -67,14 +64,12 @@ router.post('/covers', async (req, res) => {
 
     if (error) throw error;
 
-    const covers = await Promise.all(
-      seriesList
-        .filter(s => s.cover_url)
-        .map(async (s) => ({
-          seriesId: s.id,
-          url: await getPresignedUrl(s.cover_url, 86400)
-        }))
-    );
+    const covers = seriesList
+      .filter(s => s.cover_url)
+      .map((s) => ({
+        seriesId: s.id,
+        url: `/data/images/${s.cover_url}`
+      }));
 
     res.json(covers);
   } catch (error) {

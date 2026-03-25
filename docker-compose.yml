@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  comicvault:
+    build: .
+    container_name: comicvault
+    ports:
+      - "3001:3001"
+    restart: unless-stopped
+    volumes:
+      - /DATA/AppData/comicvault/data:/app/data
+    env_file:
+      - .env

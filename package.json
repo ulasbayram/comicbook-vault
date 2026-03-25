@@ -11,8 +11,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1015.0",
-    "@aws-sdk/s3-request-presigner": "^3.1015.0",
     "@supabase/supabase-js": "^2.100.0",
     "better-sqlite3": "^12.8.0",
     "concurrently": "^9.2.1",
@@ -25,6 +23,7 @@
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-router-dom": "^7.13.2",
+    "react-zoom-pan-pinch": "^3.7.0",
     "sharp": "^0.34.5",
     "unzipper": "^0.12.3"
   },

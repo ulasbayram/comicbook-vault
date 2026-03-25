@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { supabase } from '../lib/supabase';
 import './Reader.css';
 
@@ -197,13 +198,25 @@ function Reader({ session }) {
             ref={el => pageRefs.current[page.page_number] = el}
             data-page={page.page_number}
           >
-            <img
-              src={page.image_url}
-              alt={`Page ${page.page_number}`}
-              loading="lazy"
-              className="page-image"
-              draggable="false"
-            />
+            <TransformWrapper
+              initialScale={1}
+              minScale={1}
+              maxScale={4}
+              centerZoomedOut={true}
+              wheel={{ step: 0.15 }}
+              doubleClick={{ step: 1.5 }}
+              panning={{ disabled: false }}
+            >
+              <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }} contentStyle={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <img
+                  src={page.image_url}
+                  alt={`Page ${page.page_number}`}
+                  loading="lazy"
+                  className="page-image"
+                  draggable="false"
+                />
+              </TransformComponent>
+            </TransformWrapper>
           </div>
         ))}
       </div>

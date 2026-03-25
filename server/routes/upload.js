@@ -7,7 +7,9 @@ import sharp from 'sharp';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import supabase from '../lib/supabase.js';
-import { uploadToR2 } from '../lib/r2.js';
+
+const IMAGES_DIR = path.join(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..'), 'data', 'images');
+fs.mkdirSync(IMAGES_DIR, { recursive: true });
 
 const execAsync = promisify(exec);
 
@@ -194,13 +196,15 @@ router.post('/', upload.single('file'), async (req, res) => {
       const webpBuffer = await sharp(srcPath).webp({ quality: 85 }).toBuffer();
       const metadata = await sharp(srcPath).metadata();
 
-      const r2Key = `${userId}/${finalSeriesId}/${issueId}/page-${String(i + 1).padStart(4, '0')}.webp`;
-      await uploadToR2(r2Key, webpBuffer);
+      const relativeKey = `${userId}/${finalSeriesId}/${issueId}/page-${String(i + 1).padStart(4, '0')}.webp`;
+      const fullPath = path.join(IMAGES_DIR, relativeKey);
+      fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+      fs.writeFileSync(fullPath, webpBuffer);
 
       pageData.push({
         issue_id: issueId,
         page_number: i + 1,
-        image_key: r2Key,
+        image_key: relativeKey,
         width: metadata.width,
         height: metadata.height,
       });
@@ -230,7 +234,9 @@ router.post('/', upload.single('file'), async (req, res) => {
         .toBuffer();
 
       const coverKey = `${userId}/covers/${finalSeriesId}.webp`;
-      await uploadToR2(coverKey, coverBuffer);
+      const fullPath = path.join(IMAGES_DIR, coverKey);
+      fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+      fs.writeFileSync(fullPath, coverBuffer);
 
       // Only set cover if series doesn't have one
       const { data: currentSeries } = await supabase

@@ -22,9 +22,17 @@ app.use(express.json());
 // Serve local temp files during processing (if needed)
 app.use('/data', express.static(path.join(ROOT, 'data')));
 
+// Serve the compiled Vite frontend out of dist/
+app.use(express.static(path.join(ROOT, 'dist')));
+
 // API routes
 app.use('/api/upload', uploadRoutes);
 app.use('/api/images', imagesRoutes);
+
+// Catch-all route to serve index.html for React Router
+app.get('*', (req, res) => {
+  res.sendFile(path.join(ROOT, 'dist', 'index.html'));
+});
 
 app.listen(PORT, '0.0.0.0', () => {
   const nets = os.networkInterfaces();
