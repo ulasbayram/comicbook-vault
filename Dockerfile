@@ -8,14 +8,17 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies (ignoring devDependencies)
-RUN npm ci --omit=dev && npm install -g vite concurrently
+# Install all dependencies (devDependencies are needed for vite build)
+RUN npm ci
 
 # Copy the rest of the app
 COPY . .
 
 # Build Vite frontend
 RUN npm run build
+
+# Remove devDependencies to keep the image small
+RUN npm prune --omit=dev
 
 # Expose the express API port
 EXPOSE 3001
