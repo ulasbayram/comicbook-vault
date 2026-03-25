@@ -134,51 +134,70 @@ async function extractCbrImages(cbrPath, outputDir) {
   const nativeExtractDir = path.join(outputDir, 'native_extract');
   fs.mkdirSync(nativeExtractDir, { recursive: true });
 
-  try {
-    // Try native 7zip first (much faster, uses no JS memory, gracefully handles solid archives via cleanroom RAR5)
-    await execAsync(`7zz e -y "${cbrPath}" -o"${nativeExtractDir}/"`);
-  } catch (error) {
-    // 7zip often exits with a non-zero code (warning/error) due to metadata/junk files inside CBRs.
-    console.log('Native 7zip exited with error/warning, checking if files were extracted anyway:', error.message);
+  const errors = [];
+
+  const extractors = [
+    { cmd: `7zz e -y "${cbrPath}" -o"${nativeExtractDir}/"`, name: '7zz' },
+    { cmd: `7z e -y "${cbrPath}" -o"${nativeExtractDir}/"`, name: '7z' },
+    { cmd: `unrar e -y "${cbrPath}" "${nativeExtractDir}/"`, name: 'unrar' }
+  ];
+
+  for (const { cmd, name } of extractors) {
+    try {
+      await execAsync(cmd);
+    } catch (err) {
+      errors.push(`[${name} shell]: ${err.message.split('\\n')[0]}`);
+    }
   }
 
+  // Check if any files made it out
   try {
-    const paths = processExtractedFiles(nativeExtractDir, outputDir);
-    if (paths.length > 0) return paths;
-  } catch (err) {}
+    const files = fs.readdirSync(nativeExtractDir);
+    if (files.length > 0) {
+      const paths = processExtractedFiles(nativeExtractDir, outputDir);
+      if (paths.length > 0) return paths;
 
-  console.log('Native 7zip extracted 0 images, falling back to node-unrar-js...');
+      // Identify extensions present but rejected
+      const allExts = [...new Set(files.map(f => path.extname(f).toLowerCase()))];
+      errors.push(`[Native Reader]: Files extracted, but no valid images found! Extensions present: ${allExts.join(', ')}`);
+    } else {
+      errors.push(`[Native Reader]: The binaries ran but extracted 0 files into the output folder.`);
+    }
+  } catch (e) {
+    errors.push(`[Native Process]: ${e.message}`);
+  }
 
   // Fallback to node-unrar-js
-  const { createExtractorFromFile } = await import('node-unrar-js');
-  const extractor = await createExtractorFromFile({ filepath: cbrPath });
-  const list = extractor.extract();
+  try {
+    const { createExtractorFromFile } = await import('node-unrar-js');
+    const extractor = await createExtractorFromFile({ filepath: cbrPath });
+    const list = extractor.extract();
 
-  const entries = [];
-  for (const entry of list.files) {
-    const ext = path.extname(entry.fileHeader.name).toLowerCase();
-    if (IMAGE_EXTENSIONS.includes(ext) && !entry.fileHeader.flags.directory) {
-      entries.push({ name: entry.fileHeader.name, extraction: entry.extraction });
+    const entries = [];
+    for (const entry of list.files) {
+      const ext = path.extname(entry.fileHeader.name).toLowerCase();
+      if (IMAGE_EXTENSIONS.includes(ext) && !entry.fileHeader.flags.directory) {
+        entries.push({ name: entry.fileHeader.name, extraction: entry.extraction });
+      }
     }
-  }
-  entries.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    entries.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 
-  const paths = [];
-  for (let i = 0; i < entries.length; i++) {
-    if (!entries[i].extraction) {
-      console.warn(`Extraction yielded undefined for file: ${entries[i].name}`);
-      continue;
+    const paths = [];
+    for (let i = 0; i < entries.length; i++) {
+      if (!entries[i].extraction) continue;
+      const ext = path.extname(entries[i].name).toLowerCase();
+      const outPath = path.join(outputDir, `page-${String(i + 1).padStart(4, '0')}${ext}`);
+      fs.writeFileSync(outPath, Buffer.from(entries[i].extraction));
+      paths.push(outPath);
     }
-    const ext = path.extname(entries[i].name).toLowerCase();
-    const outPath = path.join(outputDir, `page-${String(i + 1).padStart(4, '0')}${ext}`);
-    fs.writeFileSync(outPath, Buffer.from(entries[i].extraction));
-    paths.push(outPath);
+    
+    if (paths.length > 0) return paths;
+    errors.push('[node-unrar-js]: File parsed, but all extracted image buffers were undefined (Solid archive or OOM).');
+  } catch (e) {
+    errors.push(`[node-unrar-js]: ${e.message}`);
   }
-  
-  if (paths.length === 0) {
-    throw new Error('Failed to extract any images from CBR archive. The file might be corrupted, a solid archive, or too large for memory limits.');
-  }
-  return paths;
+
+  throw new Error(`CBR Error Logs:\\n${errors.join('\\n')}`);
 }
 
 // ---- Get source images ----
