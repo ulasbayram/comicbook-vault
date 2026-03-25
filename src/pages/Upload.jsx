@@ -1,10 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { fetchApi } from '../lib/api';
 import './Upload.css';
-
-// Upload always goes to the local Express server (processing needs it)
-const UPLOAD_API = import.meta.env.VITE_UPLOAD_API_URL || 'http://localhost:3001';
 
 function Upload({ session }) {
   const [searchParams] = useSearchParams();
@@ -32,12 +29,12 @@ function Upload({ session }) {
   }, []);
 
   async function fetchSeriesList() {
-    const { data, error } = await supabase
-      .from('series')
-      .select('id, title, category')
-      .order('title', { ascending: true });
-
-    if (!error) setExistingSeries(data || []);
+    try {
+      const data = await fetchApi('/series');
+      setExistingSeries(data || []);
+    } catch {
+      setExistingSeries([]);
+    }
   }
 
   function handleDrag(e) {
@@ -94,15 +91,12 @@ function Upload({ session }) {
       formData.append('issueNumber', form.issueNumber);
       formData.append('issueTitle', form.issueTitle);
 
-      setProgress('Processing pages and uploading to cloud...');
+      setProgress('Processing pages and uploading to library...');
 
-      const res = await fetch(`${UPLOAD_API}/api/upload`, {
+      const data = await fetchApi('/upload', {
         method: 'POST',
         body: formData
       });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
 
       setProgress(`Done! ${data.pageCount} pages processed.`);
       setTimeout(() => navigate(`/series/${data.seriesId}`), 1000);

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
-import { supabase } from '../lib/supabase';
+import { fetchApi } from '../lib/api';
 import './Reader.css';
 
 function Reader({ session }) {
@@ -26,30 +26,18 @@ function Reader({ session }) {
       setLoading(true);
       try {
         // Get issue info
-        const { data: issueData } = await supabase
-          .from('issues')
-          .select('*, series(*)')
-          .eq('id', issueId)
-          .single();
-
+        const issueData = await fetchApi(`/series/issue/${issueId}`);
         if (issueData) {
           setIssue(issueData);
           setSeries(issueData.series);
         }
 
         // Get reading progress
-        const { data: progress } = await supabase
-          .from('reading_progress')
-          .select('current_page')
-          .eq('issue_id', issueId)
-          .eq('user_id', session.user.id)
-          .single();
-
+        const progress = await fetchApi(`/progress/${issueId}`).catch(() => null);
         if (progress?.current_page) setCurrentPage(progress.current_page);
 
         // Get pages with presigned URLs from backend
-        const res = await fetch(`/api/images/issue/${issueId}`);
-        const pagesData = await res.json();
+        const pagesData = await fetchApi(`/images/issue/${issueId}`);
         setPages(pagesData);
       } catch (err) {
         console.error('Failed to load issue:', err);
@@ -86,14 +74,10 @@ function Reader({ session }) {
   useEffect(() => {
     if (!pages.length || currentPage <= 1) return;
     const timer = setTimeout(async () => {
-      await supabase
-        .from('reading_progress')
-        .upsert({
-          issue_id: issueId,
-          user_id: session.user.id,
-          current_page: currentPage,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'issue_id,user_id' });
+      await fetchApi('/progress', {
+        method: 'POST',
+        body: { issue_id: issueId, current_page: currentPage }
+      }).catch(console.error);
     }, 1000);
     return () => clearTimeout(timer);
   }, [currentPage, issueId, pages]);

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { fetchApi } from '../lib/api';
 import ComicCard from '../components/ComicCard';
 import './Home.css';
 
@@ -23,28 +23,12 @@ function Home({ session }) {
   async function fetchSeries() {
     setLoading(true);
     try {
-      let query = supabase
-        .from('series')
-        .select('*, issues(count)')
-        .order('created_at', { ascending: false });
+      const qs = new URLSearchParams();
+      if (category !== 'all') qs.append('category', category);
+      if (search) qs.append('search', search);
 
-      if (category !== 'all') {
-        query = query.eq('category', category);
-      }
-      if (search) {
-        query = query.ilike('title', `%${search}%`);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-
-      // Transform the count format
-      const transformed = (data || []).map(s => ({
-        ...s,
-        issue_count: s.issues?.[0]?.count || 0
-      }));
-
-      setSeries(transformed);
+      const data = await fetchApi(`/series?${qs.toString()}`);
+      setSeries(data || []);
     } catch (err) {
       console.error('Failed to fetch series:', err);
     }

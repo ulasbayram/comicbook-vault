@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { fetchApi } from '../lib/api';
 import './SeriesDetail.css';
 
 function SeriesDetail({ session }) {
@@ -25,13 +25,7 @@ function SeriesDetail({ session }) {
     setLoading(true);
     try {
       // Get series
-      const { data: seriesData, error: seriesError } = await supabase
-        .from('series')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (seriesError) throw seriesError;
+      const seriesData = await fetchApi(`/series/${id}`);
       setSeries(seriesData);
 
       // Get cover URL
@@ -42,30 +36,9 @@ function SeriesDetail({ session }) {
           .catch(() => {});
       }
 
-      // Get issues with reading progress
-      const { data: issuesData, error: issuesError } = await supabase
-        .from('issues')
-        .select('*')
-        .eq('series_id', id)
-        .order('issue_number', { ascending: true });
-
-      if (issuesError) throw issuesError;
-
-      // Get reading progress for each issue
-      const issuesWithProgress = await Promise.all(
-        (issuesData || []).map(async (issue) => {
-          const { data: progress } = await supabase
-            .from('reading_progress')
-            .select('current_page')
-            .eq('issue_id', issue.id)
-            .eq('user_id', session.user.id)
-            .single();
-
-          return { ...issue, current_page: progress?.current_page || null };
-        })
-      );
-
-      setIssues(issuesWithProgress);
+      // Get issues with reading progress from backend
+      const issuesWithProgress = await fetchApi(`/series/${id}/issues`);
+      setIssues(issuesWithProgress || []);
     } catch (err) {
       console.error('Failed to fetch series:', err);
     }
@@ -75,7 +48,7 @@ function SeriesDetail({ session }) {
   async function deleteSeries() {
     if (!confirm('Delete this series and all its issues?')) return;
     try {
-      await supabase.from('series').delete().eq('id', id);
+      await fetchApi(`/series/${id}`, { method: 'DELETE' });
       navigate('/');
     } catch (err) {
       console.error('Failed to delete:', err);

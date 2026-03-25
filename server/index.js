@@ -8,6 +8,9 @@ dotenv.config();
 
 import uploadRoutes from './routes/upload.js';
 import imagesRoutes from './routes/images.js';
+import authRoutes from './routes/auth.js';
+import seriesRoutes from './routes/series.js';
+import progressRoutes from './routes/progress.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -28,9 +31,12 @@ app.use(express.static(path.join(ROOT, 'dist')));
 // API routes
 app.use('/api/upload', uploadRoutes);
 app.use('/api/images', imagesRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/series', seriesRoutes);
+app.use('/api/progress', progressRoutes);
 
 // Catch-all route to serve index.html for React Router
-app.get('*', (req, res) => {
+app.use((req, res) => {
   res.sendFile(path.join(ROOT, 'dist', 'index.html'));
 });
 

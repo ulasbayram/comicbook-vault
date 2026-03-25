@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { supabase } from './lib/supabase';
+import { auth } from './lib/api';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import SeriesDetail from './pages/SeriesDetail';
@@ -15,17 +15,10 @@ function App() {
 
   useEffect(() => {
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    auth.getSession().then((session) => {
       setSession(session);
       setLoading(false);
     });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    return () => subscription.unsubscribe();
   }, []);
 
   if (loading) {

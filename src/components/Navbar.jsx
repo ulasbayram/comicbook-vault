@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { auth } from '../lib/api';
 import './Navbar.css';
 
 function Navbar({ session }) {
@@ -7,7 +7,8 @@ function Navbar({ session }) {
   const userEmail = session?.user?.email || '';
 
   async function handleLogout() {
-    await supabase.auth.signOut();
+    await auth.signOut();
+    window.location.reload();
   }
 
   return (

@@ -6,7 +6,8 @@ import { fileURLToPath } from 'url';
 import sharp from 'sharp';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import supabase from '../lib/supabase.js';
+import crypto from 'crypto';
+import db from '../lib/db.js';
 
 const IMAGES_DIR = path.join(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..'), 'data', 'images');
 fs.mkdirSync(IMAGES_DIR, { recursive: true });
@@ -166,25 +167,19 @@ router.post('/', upload.single('file'), async (req, res) => {
     if (!seriesId || seriesId === 'new') {
       if (!seriesTitle) return res.status(400).json({ error: 'Series title required' });
 
-      const { data: newSeries, error } = await supabase
-        .from('series')
-        .insert({ title: seriesTitle, category: category || 'comic', description: description || '', user_id: userId })
-        .select('id')
-        .single();
-
-      if (error) throw error;
-      finalSeriesId = newSeries.id;
+      finalSeriesId = crypto.randomUUID();
+      db.prepare(`
+        INSERT INTO series (id, title, category, description, user_id) 
+        VALUES (?, ?, ?, ?, ?)
+      `).run(finalSeriesId, seriesTitle, category || 'comic', description || '', userId);
     }
 
     // Create issue
-    const { data: newIssue, error: issueError } = await supabase
-      .from('issues')
-      .insert({ series_id: finalSeriesId, issue_number: parseInt(issueNumber) || 1, title: issueTitle || '' })
-      .select('id')
-      .single();
-
-    if (issueError) throw issueError;
-    const issueId = newIssue.id;
+    const issueId = crypto.randomUUID();
+    db.prepare(`
+      INSERT INTO issues (id, series_id, issue_number, title)
+      VALUES (?, ?, ?, ?)
+    `).run(issueId, finalSeriesId, parseInt(issueNumber) || 1, issueTitle || '');
 
     // Extract/convert source images
     const sourceImages = await getSourceImages(req.file.path, fileType, tempDir);
@@ -219,12 +214,20 @@ router.post('/', upload.single('file'), async (req, res) => {
       is_double_spread: isDoubleSpread(p.width, p.height, medianRatio)
     }));
 
-    // Insert all pages into Supabase
-    const { error: pagesError } = await supabase.from('pages').insert(pagesWithSpread);
-    if (pagesError) throw pagesError;
+    // Insert all pages into SQLite
+    const insertPage = db.prepare(`
+      INSERT INTO pages (id, issue_id, page_number, image_key, width, height, is_double_spread)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+    
+    db.transaction((pages) => {
+      for (const p of pages) {
+        insertPage.run(crypto.randomUUID(), p.issue_id, p.page_number, p.image_key, p.width, p.height, p.is_double_spread ? 1 : 0);
+      }
+    })(pagesWithSpread);
 
     // Update issue page count
-    await supabase.from('issues').update({ page_count: pageData.length }).eq('id', issueId);
+    db.prepare('UPDATE issues SET page_count = ? WHERE id = ?').run(pageData.length, issueId);
 
     // Generate and upload cover
     if (sourceImages.length > 0) {
@@ -239,11 +242,10 @@ router.post('/', upload.single('file'), async (req, res) => {
       fs.writeFileSync(fullPath, coverBuffer);
 
       // Only set cover if series doesn't have one
-      const { data: currentSeries } = await supabase
-        .from('series').select('cover_url').eq('id', finalSeriesId).single();
+      const currentSeries = db.prepare('SELECT cover_url FROM series WHERE id = ?').get(finalSeriesId);
 
       if (!currentSeries?.cover_url) {
-        await supabase.from('series').update({ cover_url: coverKey }).eq('id', finalSeriesId);
+        db.prepare('UPDATE series SET cover_url = ? WHERE id = ?').run(coverKey, finalSeriesId);
       }
     }
 

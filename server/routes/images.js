@@ -1,21 +1,16 @@
 import { Router } from 'express';
-import supabase from '../lib/supabase.js';
+import db from '../lib/db.js';
 
 const router = Router();
 
 // Get presigned URLs for all pages of an issue
-router.get('/issue/:issueId', async (req, res) => {
+router.get('/issue/:issueId', (req, res) => {
   try {
     const { issueId } = req.params;
 
     // Get all pages for this issue
-    const { data: pages, error } = await supabase
-      .from('pages')
-      .select('*')
-      .eq('issue_id', issueId)
-      .order('page_number', { ascending: true });
+    const pages = db.prepare('SELECT * FROM pages WHERE issue_id = ? ORDER BY page_number ASC').all(issueId);
 
-    if (error) throw error;
     if (!pages?.length) return res.status(404).json({ error: 'No pages found' });
 
     // Return local URLs for all pages
@@ -32,15 +27,11 @@ router.get('/issue/:issueId', async (req, res) => {
 });
 
 // Get presigned URL for a cover image
-router.get('/cover/:seriesId', async (req, res) => {
+router.get('/cover/:seriesId', (req, res) => {
   try {
-    const { data: series, error } = await supabase
-      .from('series')
-      .select('cover_url')
-      .eq('id', req.params.seriesId)
-      .single();
+    const series = db.prepare('SELECT cover_url FROM series WHERE id = ?').get(req.params.seriesId);
 
-    if (error || !series?.cover_url) {
+    if (!series || !series.cover_url) {
       return res.status(404).json({ error: 'No cover found' });
     }
 
@@ -52,17 +43,14 @@ router.get('/cover/:seriesId', async (req, res) => {
 });
 
 // Batch cover URLs for library page
-router.post('/covers', async (req, res) => {
+router.post('/covers', (req, res) => {
   try {
     const { seriesIds } = req.body;
     if (!seriesIds?.length) return res.json([]);
 
-    const { data: seriesList, error } = await supabase
-      .from('series')
-      .select('id, cover_url')
-      .in('id', seriesIds);
-
-    if (error) throw error;
+    // Create a dynamic IN clause
+    const placeholders = seriesIds.map(() => '?').join(',');
+    const seriesList = db.prepare(`SELECT id, cover_url FROM series WHERE id IN (${placeholders})`).all(...seriesIds);
 
     const covers = seriesList
       .filter(s => s.cover_url)

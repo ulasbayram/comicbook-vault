@@ -1,0 +1,118 @@
+import { Router } from 'express';
+import db from '../lib/db.js';
+import { authenticate } from '../middleware/auth.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const router = Router();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const IMAGES_DIR = path.join(path.resolve(__dirname, '..', '..'), 'data', 'images');
+
+// GET /api/series -> list all series with issue count
+router.get('/', authenticate, (req, res) => {
+  try {
+    const { category, search } = req.query;
+    let query = `
+      SELECT s.*, COUNT(i.id) as issue_count 
+      FROM series s
+      LEFT JOIN issues i ON s.id = i.series_id
+      WHERE s.user_id = ?
+    `;
+    const params = [req.userId];
+
+    if (category && category !== 'all') {
+      query += ` AND s.category = ?`;
+      params.push(category);
+    }
+
+    if (search) {
+      query += ` AND s.title LIKE ?`;
+      params.push(`%${search}%`);
+    }
+
+    query += ` GROUP BY s.id ORDER BY s.created_at DESC`;
+
+    const series = db.prepare(query).all(...params);
+    res.json(series);
+  } catch (error) {
+    console.error('Fetch series error:', error);
+    res.status(500).json({ error: 'Failed to fetch series' });
+  }
+});
+
+// GET /api/series/:id -> get single series details
+router.get('/:id', authenticate, (req, res) => {
+  try {
+    const series = db.prepare('SELECT * FROM series WHERE id = ? AND user_id = ?').get(req.params.id, req.userId);
+    if (!series) return res.status(404).json({ error: 'Series not found' });
+    
+    res.json(series);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch series details' });
+  }
+});
+
+// GET /api/series/:id/issues -> get issues for a series along with reading progress
+router.get('/:id/issues', authenticate, (req, res) => {
+  try {
+    const issues = db.prepare(`
+      SELECT i.*, rp.current_page 
+      FROM issues i
+      LEFT JOIN reading_progress rp ON i.id = rp.issue_id AND rp.user_id = ?
+      WHERE i.series_id = ?
+      ORDER BY i.issue_number ASC
+    `).all(req.userId, req.params.id);
+
+    res.json(issues);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch issues' });
+  }
+});
+
+// GET /api/series/issue/:id -> get single issue with series
+router.get('/issue/:id', authenticate, (req, res) => {
+  try {
+    const issue = db.prepare('SELECT * FROM issues WHERE id = ?').get(req.params.id);
+    if (!issue) return res.status(404).json({ error: 'Issue not found' });
+    
+    // Check if user owns the series
+    const series = db.prepare('SELECT * FROM series WHERE id = ? AND user_id = ?').get(issue.series_id, req.userId);
+    if (!series) return res.status(403).json({ error: 'Access denied' });
+    
+    issue.series = series;
+    res.json(issue);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch issue' });
+  }
+});
+
+// DELETE /api/series/:id
+router.delete('/:id', authenticate, (req, res) => {
+  try {
+    // Check ownership
+    const series = db.prepare('SELECT id, cover_url FROM series WHERE id = ? AND user_id = ?').get(req.params.id, req.userId);
+    if (!series) return res.status(404).json({ error: 'Series not found' });
+
+    // SQLite ON DELETE CASCADE will delete issues, pages, and reading_progress from DB
+    db.prepare('DELETE FROM series WHERE id = ?').run(req.params.id);
+
+    // Optionally clean up files - this deletes the whole series folder
+    const seriesFolder = path.join(IMAGES_DIR, req.userId, req.params.id);
+    fs.rmSync(seriesFolder, { recursive: true, force: true });
+    
+    // Also delete cover
+    if (series.cover_url) {
+      const coverPath = path.join(IMAGES_DIR, series.cover_url);
+      fs.rmSync(coverPath, { force: true });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete series error:', error);
+    res.status(500).json({ error: 'Failed to delete series' });
+  }
+});
+
+export default router;

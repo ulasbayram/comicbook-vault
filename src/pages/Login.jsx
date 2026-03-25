@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { auth } from '../lib/api';
 import './Login.css';
 
 function Login() {
@@ -18,13 +18,13 @@ function Login() {
 
     try {
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
+        await auth.signUp(email, password);
         setMessage('Account created! You can now sign in.');
         setIsSignUp(false);
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        await auth.signIn(email, password);
+        // Page reload to apply session globally since we removed auth listeners
+        window.location.reload();
       }
     } catch (err) {
       setError(err.message);
