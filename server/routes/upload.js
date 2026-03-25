@@ -109,8 +109,41 @@ async function extractCbzImages(cbzPath, outputDir) {
   return paths;
 }
 
+// ---- Native File Processing Helper ----
+function processExtractedFiles(sourceDir, destDir) {
+  const files = fs.readdirSync(sourceDir)
+    .filter(f => {
+      const ext = path.extname(f).toLowerCase();
+      return IMAGE_EXTENSIONS.includes(ext) && !f.startsWith('__MACOSX') && !f.startsWith('.');
+    })
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+
+  const paths = [];
+  for (let i = 0; i < files.length; i++) {
+    const ext = path.extname(files[i]).toLowerCase();
+    const oldPath = path.join(sourceDir, files[i]);
+    const newPath = path.join(destDir, `page-${String(i + 1).padStart(4, '0')}${ext}`);
+    fs.renameSync(oldPath, newPath);
+    paths.push(newPath);
+  }
+  return paths;
+}
+
 // ---- CBR extraction ----
 async function extractCbrImages(cbrPath, outputDir) {
+  const nativeExtractDir = path.join(outputDir, 'native_extract');
+  fs.mkdirSync(nativeExtractDir, { recursive: true });
+
+  try {
+    // Try native unrar first (much faster, uses no JS memory, gracefully handles solid archives)
+    await execAsync(`unrar e -y "${cbrPath}" "${nativeExtractDir}/"`);
+    const paths = processExtractedFiles(nativeExtractDir, outputDir);
+    if (paths.length > 0) return paths;
+  } catch (error) {
+    console.log('Native unrar failed or not found, falling back to node-unrar-js...');
+  }
+
+  // Fallback to node-unrar-js
   const { createExtractorFromFile } = await import('node-unrar-js');
   const extractor = await createExtractorFromFile({ filepath: cbrPath });
   const list = extractor.extract();
@@ -126,10 +159,18 @@ async function extractCbrImages(cbrPath, outputDir) {
 
   const paths = [];
   for (let i = 0; i < entries.length; i++) {
+    if (!entries[i].extraction) {
+      console.warn(`Extraction yielded undefined for file: ${entries[i].name}`);
+      continue;
+    }
     const ext = path.extname(entries[i].name).toLowerCase();
     const outPath = path.join(outputDir, `page-${String(i + 1).padStart(4, '0')}${ext}`);
     fs.writeFileSync(outPath, Buffer.from(entries[i].extraction));
     paths.push(outPath);
+  }
+  
+  if (paths.length === 0) {
+    throw new Error('Failed to extract any images from CBR archive. The file might be corrupted, a solid archive, or too large for memory limits.');
   }
   return paths;
 }

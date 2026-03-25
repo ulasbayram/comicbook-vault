@@ -57,7 +57,7 @@ router.post('/login', (req, res) => {
 
   try {
     const user = db.prepare('SELECT id, password_hash FROM users WHERE email = ?').get(email);
-    
+
     if (!user || !verifyPassword(password, user.password_hash)) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -77,7 +77,7 @@ router.post('/login', (req, res) => {
 router.get('/me', authenticate, (req, res) => {
   try {
     const user = { id: req.userId, email: req.userEmail, isAdmin: req.isAdmin };
-    
+
     // Create dummy session object for frontend compat
     res.json({ session: { user } });
   } catch (error) {
