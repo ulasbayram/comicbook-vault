@@ -111,17 +111,31 @@ async function extractCbzImages(cbzPath, outputDir) {
 
 // ---- Native File Processing Helper ----
 function processExtractedFiles(sourceDir, destDir) {
-  const files = fs.readdirSync(sourceDir)
+  function getAllFiles(dir, fileList = []) {
+    const files = fs.readdirSync(dir);
+    for (const file of files) {
+      const filePath = path.join(dir, file);
+      if (fs.statSync(filePath).isDirectory()) {
+        getAllFiles(filePath, fileList);
+      } else {
+        fileList.push(filePath);
+      }
+    }
+    return fileList;
+  }
+
+  const files = getAllFiles(sourceDir)
     .filter(f => {
       const ext = path.extname(f).toLowerCase();
-      return IMAGE_EXTENSIONS.includes(ext) && !f.startsWith('__MACOSX') && !f.startsWith('.');
+      const base = path.basename(f);
+      return IMAGE_EXTENSIONS.includes(ext) && !base.startsWith('__MACOSX') && !base.startsWith('.');
     })
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
   const paths = [];
   for (let i = 0; i < files.length; i++) {
     const ext = path.extname(files[i]).toLowerCase();
-    const oldPath = path.join(sourceDir, files[i]);
+    const oldPath = files[i];
     const newPath = path.join(destDir, `page-${String(i + 1).padStart(4, '0')}${ext}`);
     fs.renameSync(oldPath, newPath);
     paths.push(newPath);
@@ -137,8 +151,9 @@ async function extractCbrImages(cbrPath, outputDir) {
   const errors = [];
 
   const extractors = [
-    { cmd: `7zz e -y "${cbrPath}" -o"${nativeExtractDir}/"`, name: '7zz' },
-    { cmd: `7z e -y "${cbrPath}" -o"${nativeExtractDir}/"`, name: '7z' },
+    { cmd: `bsdtar -xf "${cbrPath}" -C "${nativeExtractDir}/"`, name: 'bsdtar' },
+    { cmd: `7zz x -y "${cbrPath}" -o"${nativeExtractDir}/"`, name: '7zz' },
+    { cmd: `7z x -y "${cbrPath}" -o"${nativeExtractDir}/"`, name: '7z' },
     { cmd: `unrar e -y "${cbrPath}" "${nativeExtractDir}/"`, name: 'unrar' }
   ];
 
