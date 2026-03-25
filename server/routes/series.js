@@ -18,9 +18,9 @@ router.get('/', authenticate, (req, res) => {
       SELECT s.*, COUNT(i.id) as issue_count 
       FROM series s
       LEFT JOIN issues i ON s.id = i.series_id
-      WHERE s.user_id = ?
+      WHERE 1=1
     `;
-    const params = [req.userId];
+    const params = [];
 
     if (category && category !== 'all') {
       query += ` AND s.category = ?`;
@@ -45,7 +45,7 @@ router.get('/', authenticate, (req, res) => {
 // GET /api/series/:id -> get single series details
 router.get('/:id', authenticate, (req, res) => {
   try {
-    const series = db.prepare('SELECT * FROM series WHERE id = ? AND user_id = ?').get(req.params.id, req.userId);
+    const series = db.prepare('SELECT * FROM series WHERE id = ?').get(req.params.id);
     if (!series) return res.status(404).json({ error: 'Series not found' });
     
     res.json(series);
@@ -77,9 +77,9 @@ router.get('/issue/:id', authenticate, (req, res) => {
     const issue = db.prepare('SELECT * FROM issues WHERE id = ?').get(req.params.id);
     if (!issue) return res.status(404).json({ error: 'Issue not found' });
     
-    // Check if user owns the series
-    const series = db.prepare('SELECT * FROM series WHERE id = ? AND user_id = ?').get(issue.series_id, req.userId);
-    if (!series) return res.status(403).json({ error: 'Access denied' });
+    // Check if series exists
+    const series = db.prepare('SELECT * FROM series WHERE id = ?').get(issue.series_id);
+    if (!series) return res.status(404).json({ error: 'Series not found' });
     
     issue.series = series;
     res.json(issue);
