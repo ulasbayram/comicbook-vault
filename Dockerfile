@@ -1,8 +1,7 @@
 FROM node:22-alpine
 
 # Install OS dependencies required for pdf-poppler, canvas/sharp, and native CBR extraction
-RUN apk add --no-cache poppler-utils ghostscript cairo pango jpeg giflib && \
-    apk add --no-cache unrar --repository=http://dl-cdn.alpinelinux.org/alpine/edge/non-free
+RUN apk add --no-cache poppler-utils ghostscript cairo pango jpeg giflib 7zip
 
 WORKDIR /app
 

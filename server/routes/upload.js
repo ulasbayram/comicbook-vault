@@ -135,12 +135,12 @@ async function extractCbrImages(cbrPath, outputDir) {
   fs.mkdirSync(nativeExtractDir, { recursive: true });
 
   try {
-    // Try native unrar first (much faster, uses no JS memory, gracefully handles solid archives)
-    await execAsync(`unrar e -y "${cbrPath}" "${nativeExtractDir}/"`);
+    // Try native 7zip first (much faster, uses no JS memory, gracefully handles solid archives via cleanroom RAR5)
+    await execAsync(`7zz x -y "${cbrPath}" -o"${nativeExtractDir}/"`);
     const paths = processExtractedFiles(nativeExtractDir, outputDir);
     if (paths.length > 0) return paths;
   } catch (error) {
-    console.log('Native unrar failed or not found, falling back to node-unrar-js...');
+    console.log('Native 7zip failed or not found, falling back to node-unrar-js...');
   }
 
   // Fallback to node-unrar-js
