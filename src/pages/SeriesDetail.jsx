@@ -107,8 +107,12 @@ function SeriesDetail({ session }) {
             {issues.length > 0 && (
               <Link to={`/read/${issues[0].id}`} className="btn btn-primary">Start Reading</Link>
             )}
-            <Link to={`/upload?seriesId=${series.id}`} className="btn btn-secondary">Add Issue</Link>
-            <button className="btn btn-danger" onClick={deleteSeries}>Delete Series</button>
+            {session?.user?.isAdmin && (
+              <>
+                <Link to={`/upload?seriesId=${series.id}`} className="btn btn-secondary">Add Issue</Link>
+                <button className="btn btn-danger" onClick={deleteSeries}>Delete Series</button>
+              </>
+            )}
           </div>
         </div>
       </div>

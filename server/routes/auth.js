@@ -65,7 +65,7 @@ router.post('/login', (req, res) => {
     const token = generateToken();
     db.prepare('INSERT INTO sessions (token, user_id) VALUES (?, ?)').run(token, user.id);
 
-    res.json({ token, user: { id: user.id, email } });
+    res.json({ token, user: { id: user.id, email, isAdmin: email === 'ulas.bayram8527@gmail.com' } });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Login failed' });
@@ -75,8 +75,7 @@ router.post('/login', (req, res) => {
 // GET /api/auth/me
 router.get('/me', authenticate, (req, res) => {
   try {
-    const user = db.prepare('SELECT id, email FROM users WHERE id = ?').get(req.userId);
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    const user = { id: req.userId, email: req.userEmail, isAdmin: req.isAdmin };
     
     // Create dummy session object for frontend compat
     res.json({ session: { user } });

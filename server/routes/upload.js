@@ -148,8 +148,13 @@ function isDoubleSpread(width, height, medianRatio) {
   return (width / height) > medianRatio * 1.3;
 }
 
-// ---- Main upload route ----
 router.post('/', upload.single('file'), async (req, res) => {
+  if (!req.isAdmin) {
+    // Also clean up the temp file if not admin
+    if (req.file?.path) fs.rmSync(req.file.path, { force: true });
+    return res.status(403).json({ error: 'Only administrators can upload comics' });
+  }
+
   const tempDir = path.join(TEMP_DIR, `job-${Date.now()}`);
   fs.mkdirSync(tempDir, { recursive: true });
 

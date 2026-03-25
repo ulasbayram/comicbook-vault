@@ -8,14 +8,21 @@ export function authenticate(req, res, next) {
 
   const token = authHeader.split(' ')[1];
 
-  // Try to find the session
-  const session = db.prepare('SELECT user_id FROM sessions WHERE token = ?').get(token);
+  // Try to find the session and user email
+  const session = db.prepare(`
+    SELECT s.user_id, u.email 
+    FROM sessions s 
+    JOIN users u ON s.user_id = u.id 
+    WHERE s.token = ?
+  `).get(token);
 
   if (!session) {
     return res.status(401).json({ error: 'Invalid or expired session' });
   }
 
-  // Attach user ID to request
+  // Attach user ID and admin status to request
   req.userId = session.user_id;
+  req.userEmail = session.email;
+  req.isAdmin = session.email === 'ulas.bayram8527@gmail.com';
   next();
 }

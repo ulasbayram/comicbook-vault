@@ -90,8 +90,10 @@ function Home({ session }) {
         <div className="empty-state animate-fade-in">
           <div className="empty-icon">📖</div>
           <h2>No comics yet</h2>
-          <p>Upload your first comic to get started!</p>
-          <a href="/upload" className="btn btn-primary" style={{ marginTop: '1rem' }}>Upload Comic</a>
+          <p>{session?.user?.isAdmin ? 'Upload your first comic to get started!' : 'Check back later for new comics!'}</p>
+          {session?.user?.isAdmin && (
+            <a href="/upload" className="btn btn-primary" style={{ marginTop: '1rem' }}>Upload Comic</a>
+          )}
         </div>
       ) : (
         <div className="comics-grid">

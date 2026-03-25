@@ -91,8 +91,10 @@ router.get('/issue/:id', authenticate, (req, res) => {
 // DELETE /api/series/:id
 router.delete('/:id', authenticate, (req, res) => {
   try {
-    // Check ownership
-    const series = db.prepare('SELECT id, cover_url FROM series WHERE id = ? AND user_id = ?').get(req.params.id, req.userId);
+    if (!req.isAdmin) return res.status(403).json({ error: 'Only administrators can delete series' });
+
+    // Find the series cover
+    const series = db.prepare('SELECT id, cover_url FROM series WHERE id = ?').get(req.params.id);
     if (!series) return res.status(404).json({ error: 'Series not found' });
 
     // SQLite ON DELETE CASCADE will delete issues, pages, and reading_progress from DB

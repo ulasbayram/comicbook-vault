@@ -26,16 +26,18 @@ function Navbar({ session }) {
           >
             Library
           </Link>
-          <Link
-            to="/upload"
-            className={`nav-link upload-link ${location.pathname === '/upload' ? 'active' : ''}`}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <line x1="8" y1="3" x2="8" y2="13" />
-              <line x1="3" y1="8" x2="13" y2="8" />
-            </svg>
-            Upload
-          </Link>
+          {session?.user?.isAdmin && (
+            <Link
+              to="/upload"
+              className={`nav-link upload-link ${location.pathname === '/upload' ? 'active' : ''}`}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="8" y1="3" x2="8" y2="13" />
+                <line x1="3" y1="8" x2="13" y2="8" />
+              </svg>
+              Upload
+            </Link>
+          )}
 
           <div className="user-menu">
             <span className="user-email">{userEmail.split('@')[0]}</span>
