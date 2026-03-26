@@ -32,6 +32,15 @@ function Upload({ session }) {
     try {
       const data = await fetchApi('/series');
       setExistingSeries(data || []);
+      
+      // If passing a seriesId via URL, auto-calculate its issue number after loading series
+      const initId = searchParams.get('seriesId');
+      if (initId && data?.length) {
+        const selected = data.find(s => s.id === initId);
+        if (selected) {
+          setForm(f => ({ ...f, issueNumber: String((selected.issue_count || 0) + 1) }));
+        }
+      }
     } catch {
       setExistingSeries([]);
     }

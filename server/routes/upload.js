@@ -205,7 +205,7 @@ async function extractCbrImages(cbrPath, outputDir) {
       fs.writeFileSync(outPath, Buffer.from(entries[i].extraction));
       paths.push(outPath);
     }
-    
+
     if (paths.length > 0) return paths;
     errors.push('[node-unrar-js]: File parsed, but all extracted image buffers were undefined (Solid archive or OOM).');
   } catch (e) {
@@ -306,7 +306,7 @@ router.post('/', authenticate, upload.single('file'), async (req, res) => {
       INSERT INTO pages (id, issue_id, page_number, image_key, width, height, is_double_spread)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
-    
+
     db.transaction((pages) => {
       for (const p of pages) {
         insertPage.run(crypto.randomUUID(), p.issue_id, p.page_number, p.image_key, p.width, p.height, p.is_double_spread ? 1 : 0);

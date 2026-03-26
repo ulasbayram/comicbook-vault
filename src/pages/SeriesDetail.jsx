@@ -217,9 +217,9 @@ function SeriesDetail({ session }) {
                   )}
                 </div>
                 {session?.user?.isAdmin && editingIssueId !== issue.id && (
-                  <div className="admin-issue-actions" onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', gap: '8px' }}>
-                    <button onClick={(e) => startEdit(issue, e)} title="Edit Issue" style={{ background: 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer', fontSize: '14px', borderRadius: '4px', padding: '4px 8px' }}>✏️</button>
-                    <button onClick={(e) => deleteIssue(issue.id, e)} title="Delete Issue" style={{ background: 'rgba(255,50,50,0.2)', border: 'none', cursor: 'pointer', fontSize: '14px', borderRadius: '4px', padding: '4px 8px' }}>🗑️</button>
+                  <div className="admin-issue-actions" onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: '8px', marginRight: '16px', alignItems: 'center' }}>
+                    <button onClick={(e) => startEdit(issue, e)} title="Edit Issue" style={{ background: 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer', fontSize: '14px', borderRadius: '4px', padding: '6px 8px' }}>✏️</button>
+                    <button onClick={(e) => deleteIssue(issue.id, e)} title="Delete Issue" style={{ background: 'rgba(255,50,50,0.2)', border: 'none', cursor: 'pointer', fontSize: '14px', borderRadius: '4px', padding: '6px 8px' }}>🗑️</button>
                   </div>
                 )}
                 <div className="issue-arrow">→</div>
