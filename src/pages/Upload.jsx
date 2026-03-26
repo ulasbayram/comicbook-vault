@@ -118,7 +118,10 @@ function Upload({ session }) {
         <div className="form-section">
           <label className="form-label">Series</label>
           <div className="mode-toggle">
-            <button type="button" className={`toggle-btn ${mode === 'new' ? 'active' : ''}`} onClick={() => setMode('new')}>
+            <button type="button" className={`toggle-btn ${mode === 'new' ? 'active' : ''}`} onClick={() => {
+              setMode('new');
+              setForm(f => ({ ...f, issueNumber: '1', seriesId: 'new' }));
+            }}>
               New Series
             </button>
             <button type="button" className={`toggle-btn ${mode === 'existing' ? 'active' : ''}`}
@@ -157,7 +160,15 @@ function Upload({ session }) {
         ) : (
           <div className="form-group">
             <label className="form-label">Select Series *</label>
-            <select required value={form.seriesId} onChange={e => setForm(f => ({ ...f, seriesId: e.target.value }))}>
+            <select required value={form.seriesId} onChange={(e) => {
+              const selectedId = e.target.value;
+              const selectedSeries = existingSeries.find(s => s.id === selectedId);
+              setForm(f => ({
+                ...f, 
+                seriesId: selectedId,
+                issueNumber: selectedSeries ? String((selectedSeries.issue_count || 0) + 1) : '1'
+              }));
+            }}>
               <option value="">Choose a series...</option>
               {existingSeries.map(s => (<option key={s.id} value={s.id}>{s.title}</option>))}
             </select>

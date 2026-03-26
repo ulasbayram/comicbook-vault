@@ -88,6 +88,48 @@ router.get('/issue/:id', authenticate, (req, res) => {
   }
 });
 
+// PUT /api/series/issue/:id -> update issue details
+router.put('/issue/:id', authenticate, (req, res) => {
+  try {
+    if (!req.isAdmin) return res.status(403).json({ error: 'Only administrators can edit issues' });
+
+    const { title, issueNumber } = req.body;
+    db.prepare('UPDATE issues SET title = ?, issue_number = ? WHERE id = ?')
+      .run(title || '', parseInt(issueNumber) || 1, req.params.id);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Edit issue error:', error);
+    res.status(500).json({ error: 'Failed to edit issue' });
+  }
+});
+
+// DELETE /api/series/issue/:id -> delete single issue
+router.delete('/issue/:id', authenticate, (req, res) => {
+  try {
+    if (!req.isAdmin) return res.status(403).json({ error: 'Only administrators can delete issues' });
+
+    const issue = db.prepare('SELECT id, series_id FROM issues WHERE id = ?').get(req.params.id);
+    if (!issue) return res.status(404).json({ error: 'Issue not found' });
+
+    const series = db.prepare('SELECT user_id FROM series WHERE id = ?').get(issue.series_id);
+    
+    // SQLite ON DELETE CASCADE handles DB removal
+    db.prepare('DELETE FROM issues WHERE id = ?').run(req.params.id);
+
+    // Physically explicitly clean up the image folder for this specific issue
+    if (series) {
+      const issueFolder = path.join(IMAGES_DIR, series.user_id, issue.series_id, issue.id);
+      fs.rmSync(issueFolder, { recursive: true, force: true });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete issue error:', error);
+    res.status(500).json({ error: 'Failed to delete issue' });
+  }
+});
+
 // DELETE /api/series/:id
 router.delete('/:id', authenticate, (req, res) => {
   try {

@@ -11,6 +11,10 @@ function SeriesDetail({ session }) {
   const [coverUrl, setCoverUrl] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Admin inline editing state
+  const [editingIssueId, setEditingIssueId] = useState(null);
+  const [editForm, setEditForm] = useState({ title: '', issueNumber: '' });
+
   const categoryLabels = {
     comic: 'Comic',
     webtoon: 'Webtoon',
@@ -52,6 +56,37 @@ function SeriesDetail({ session }) {
       navigate('/');
     } catch (err) {
       console.error('Failed to delete:', err);
+    }
+  }
+
+  function startEdit(issue, e) {
+    if (e) e.preventDefault();
+    setEditingIssueId(issue.id);
+    setEditForm({ title: issue.title || '', issueNumber: issue.issue_number });
+  }
+
+  async function saveEdit(e) {
+    if (e) e.preventDefault();
+    try {
+      await fetchApi(`/series/issue/${editingIssueId}`, {
+        method: 'PUT',
+        body: JSON.stringify(editForm)
+      });
+      setEditingIssueId(null);
+      fetchSeries();
+    } catch (err) {
+      console.error('Save failed:', err);
+    }
+  }
+
+  async function deleteIssue(issueId, e) {
+    if (e) e.preventDefault();
+    if (!confirm('Are you sure you want to permanently delete this issue and all its pages?')) return;
+    try {
+      await fetchApi(`/series/issue/${issueId}`, { method: 'DELETE' });
+      fetchSeries();
+    } catch (err) {
+      console.error('Delete failed:', err);
     }
   }
 
@@ -128,12 +163,34 @@ function SeriesDetail({ session }) {
                 to={`/read/${issue.id}`}
                 key={issue.id}
                 className="issue-card glass-card animate-slide-up"
-                style={{ animationDelay: `${i * 0.05}s` }}
+                style={{ animationDelay: `${i * 0.05}s`, position: 'relative' }}
               >
                 <div className="issue-number">#{issue.issue_number}</div>
-                <div className="issue-info">
-                  <h3 className="issue-title">{issue.title || `Issue #${issue.issue_number}`}</h3>
-                  <p className="issue-meta">{issue.page_count} pages</p>
+                <div className="issue-info" style={{ flex: 1 }}>
+                  {editingIssueId === issue.id ? (
+                    <div className="edit-issue-form" onClick={e => e.preventDefault()} style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
+                      <input 
+                        type="number" 
+                        value={editForm.issueNumber} 
+                        onChange={e => setEditForm({...editForm, issueNumber: e.target.value})}
+                        style={{ width: '60px', padding: '4px', borderRadius: '4px', border: '1px solid #ccc', background: '#222', color: 'white' }}
+                      />
+                      <input 
+                        type="text" 
+                        value={editForm.title} 
+                        placeholder="Issue Title"
+                        onChange={e => setEditForm({...editForm, title: e.target.value})}
+                        style={{ flex: 1, padding: '4px', borderRadius: '4px', border: '1px solid #ccc', background: '#222', color: 'white' }}
+                      />
+                      <button onClick={saveEdit} className="btn btn-primary" style={{ padding: '4px 12px', fontSize: '13px' }}>Save</button>
+                      <button onClick={() => setEditingIssueId(null)} className="btn btn-secondary" style={{ padding: '4px 12px', fontSize: '13px' }}>Cancel</button>
+                    </div>
+                  ) : (
+                    <>
+                      <h3 className="issue-title">{issue.title || `Issue #${issue.issue_number}`}</h3>
+                      <p className="issue-meta">{issue.page_count} pages</p>
+                    </>
+                  )}
                   {issue.current_page && issue.current_page > 1 && (
                     <div className="issue-progress">
                       <div className="progress-bar">
@@ -148,6 +205,12 @@ function SeriesDetail({ session }) {
                     </div>
                   )}
                 </div>
+                {session?.user?.isAdmin && editingIssueId !== issue.id && (
+                  <div className="admin-issue-actions" onClick={e => e.preventDefault()} style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', gap: '8px' }}>
+                    <button onClick={(e) => startEdit(issue, e)} title="Edit Issue" style={{ background: 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer', fontSize: '14px', borderRadius: '4px', padding: '4px 8px' }}>✏️</button>
+                    <button onClick={(e) => deleteIssue(issue.id, e)} title="Delete Issue" style={{ background: 'rgba(255,50,50,0.2)', border: 'none', cursor: 'pointer', fontSize: '14px', borderRadius: '4px', padding: '4px 8px' }}>🗑️</button>
+                  </div>
+                )}
                 <div className="issue-arrow">→</div>
               </Link>
             ))}
