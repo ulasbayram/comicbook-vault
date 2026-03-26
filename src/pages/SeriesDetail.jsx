@@ -60,16 +60,23 @@ function SeriesDetail({ session }) {
   }
 
   function startEdit(issue, e) {
-    if (e) e.preventDefault();
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     setEditingIssueId(issue.id);
     setEditForm({ title: issue.title || '', issueNumber: issue.issue_number });
   }
 
   async function saveEdit(e) {
-    if (e) e.preventDefault();
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     try {
       await fetchApi(`/series/issue/${editingIssueId}`, {
         method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editForm)
       });
       setEditingIssueId(null);
@@ -80,7 +87,10 @@ function SeriesDetail({ session }) {
   }
 
   async function deleteIssue(issueId, e) {
-    if (e) e.preventDefault();
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (!confirm('Are you sure you want to permanently delete this issue and all its pages?')) return;
     try {
       await fetchApi(`/series/issue/${issueId}`, { method: 'DELETE' });
@@ -159,16 +169,16 @@ function SeriesDetail({ session }) {
         ) : (
           <div className="issues-grid">
             {issues.map((issue, i) => (
-              <Link
-                to={`/read/${issue.id}`}
+              <div
                 key={issue.id}
                 className="issue-card glass-card animate-slide-up"
-                style={{ animationDelay: `${i * 0.05}s`, position: 'relative' }}
+                style={{ animationDelay: `${i * 0.05}s`, position: 'relative', cursor: 'pointer' }}
+                onClick={() => { if (editingIssueId !== issue.id) navigate(`/read/${issue.id}`); }}
               >
                 <div className="issue-number">#{issue.issue_number}</div>
                 <div className="issue-info" style={{ flex: 1 }}>
                   {editingIssueId === issue.id ? (
-                    <div className="edit-issue-form" onClick={e => e.preventDefault()} style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
+                    <div className="edit-issue-form" onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
                       <input 
                         type="number" 
                         value={editForm.issueNumber} 
@@ -181,6 +191,7 @@ function SeriesDetail({ session }) {
                         placeholder="Issue Title"
                         onChange={e => setEditForm({...editForm, title: e.target.value})}
                         style={{ flex: 1, padding: '4px', borderRadius: '4px', border: '1px solid #ccc', background: '#222', color: 'white' }}
+                        autoFocus
                       />
                       <button onClick={saveEdit} className="btn btn-primary" style={{ padding: '4px 12px', fontSize: '13px' }}>Save</button>
                       <button onClick={() => setEditingIssueId(null)} className="btn btn-secondary" style={{ padding: '4px 12px', fontSize: '13px' }}>Cancel</button>
@@ -206,13 +217,13 @@ function SeriesDetail({ session }) {
                   )}
                 </div>
                 {session?.user?.isAdmin && editingIssueId !== issue.id && (
-                  <div className="admin-issue-actions" onClick={e => e.preventDefault()} style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', gap: '8px' }}>
+                  <div className="admin-issue-actions" onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', gap: '8px' }}>
                     <button onClick={(e) => startEdit(issue, e)} title="Edit Issue" style={{ background: 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer', fontSize: '14px', borderRadius: '4px', padding: '4px 8px' }}>✏️</button>
                     <button onClick={(e) => deleteIssue(issue.id, e)} title="Delete Issue" style={{ background: 'rgba(255,50,50,0.2)', border: 'none', cursor: 'pointer', fontSize: '14px', borderRadius: '4px', padding: '4px 8px' }}>🗑️</button>
                   </div>
                 )}
                 <div className="issue-arrow">→</div>
-              </Link>
+              </div>
             ))}
           </div>
         )}
