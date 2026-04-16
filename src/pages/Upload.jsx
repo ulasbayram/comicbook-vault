@@ -81,31 +81,72 @@ function Upload({ session }) {
     if (!file) { setError('Please select a file'); return; }
 
     setUploading(true);
-    setProgress('Uploading file...');
     setError('');
 
+    const CHUNK_SIZE = 50 * 1024 * 1024; // 50MB per chunk
+
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('userId', session.user.id);
-
+      // Build metadata shared by both paths
+      const metadata = { userId: session.user.id };
       if (mode === 'new') {
-        formData.append('seriesTitle', form.seriesTitle);
-        formData.append('seriesId', 'new');
-        formData.append('category', form.category);
-        formData.append('description', form.description);
+        metadata.seriesTitle = form.seriesTitle;
+        metadata.seriesId = 'new';
+        metadata.category = form.category;
+        metadata.description = form.description;
       } else {
-        formData.append('seriesId', form.seriesId);
+        metadata.seriesId = form.seriesId;
       }
-      formData.append('issueNumber', form.issueNumber);
-      formData.append('issueTitle', form.issueTitle);
+      metadata.issueNumber = form.issueNumber;
+      metadata.issueTitle = form.issueTitle;
 
-      setProgress('Processing pages and uploading to library...');
+      let data;
 
-      const data = await fetchApi('/upload', {
-        method: 'POST',
-        body: formData
-      });
+      if (file.size <= CHUNK_SIZE) {
+        // ---- Small file: single upload ----
+        setProgress('Uploading file...');
+        const formData = new FormData();
+        formData.append('file', file);
+        Object.entries(metadata).forEach(([k, v]) => formData.append(k, v));
+
+        setProgress('Processing pages...');
+        data = await fetchApi('/upload', { method: 'POST', body: formData });
+
+      } else {
+        // ---- Large file: chunked upload ----
+        const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+        const uploadId = `${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
+
+        // Upload each chunk
+        for (let i = 0; i < totalChunks; i++) {
+          const start = i * CHUNK_SIZE;
+          const end = Math.min(start + CHUNK_SIZE, file.size);
+          const chunk = file.slice(start, end);
+          const pct = Math.round(((i + 1) / totalChunks) * 100);
+
+          setProgress(`Uploading chunk ${i + 1}/${totalChunks} (${pct}%)...`);
+
+          const chunkForm = new FormData();
+          // Text fields MUST come before file for multer to populate req.body
+          chunkForm.append('uploadId', uploadId);
+          chunkForm.append('chunkIndex', String(i));
+          chunkForm.append('totalChunks', String(totalChunks));
+          chunkForm.append('chunk', chunk, file.name);
+
+          await fetchApi('/upload/chunk', { method: 'POST', body: chunkForm });
+        }
+
+        // Complete: reassemble and process
+        setProgress('Reassembling & processing pages...');
+        data = await fetchApi('/upload/complete', {
+          method: 'POST',
+          body: {
+            uploadId,
+            fileName: file.name,
+            totalChunks: String(totalChunks),
+            ...metadata
+          }
+        });
+      }
 
       setProgress(`Done! ${data.pageCount} pages processed.`);
       setTimeout(() => navigate(`/series/${data.seriesId}`), 1000);

@@ -16,7 +16,7 @@ function ComicCard({ series, index }) {
       fetch(`/api/images/cover/${series.id}`)
         .then(r => r.json())
         .then(data => setCoverUrl(data.url))
-        .catch(() => {});
+        .catch(() => { });
     }
   }, [series.id, series.cover_url]);
 

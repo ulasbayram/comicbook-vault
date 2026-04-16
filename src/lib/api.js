@@ -23,6 +23,9 @@ export async function fetchApi(endpoint, options = {}) {
   });
 
   if (!response.ok) {
+    if (response.status === 413) {
+      throw new Error('File too large. If using a reverse proxy (e.g. Nginx), increase its upload size limit (client_max_body_size).');
+    }
     const errData = await response.json().catch(() => ({}));
     throw new Error(errData.error || `API Error: ${response.status}`);
   }

@@ -24,6 +24,7 @@ fs.mkdirSync(TEMP_DIR, { recursive: true });
 const ALLOWED_EXTENSIONS = ['.pdf', '.cbz', '.cbr', '.zip', '.rar'];
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif', '.tiff', '.tif'];
 
+// ---- Multer for single-file uploads (legacy / small files) ----
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, TEMP_DIR),
   filename: (req, file, cb) => {
@@ -45,9 +46,34 @@ const upload = multer({
   limits: { fileSize: 500 * 1024 * 1024 }
 });
 
+// ---- Multer for chunk uploads ----
+// NOTE: In multer, req.body text fields are only populated if they appear
+// before the file field in the FormData. The frontend must append text fields first.
+const chunkStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadId = req.body.uploadId;
+    if (!uploadId) return cb(new Error('Missing uploadId'));
+    const chunkDir = path.join(TEMP_DIR, `chunks-${uploadId}`);
+    fs.mkdirSync(chunkDir, { recursive: true });
+    cb(null, chunkDir);
+  },
+  filename: (req, file, cb) => {
+    const chunkIndex = req.body.chunkIndex;
+    cb(null, `chunk-${String(chunkIndex).padStart(6, '0')}`);
+  }
+});
+
+const chunkUpload = multer({
+  storage: chunkStorage,
+  limits: { fileSize: 95 * 1024 * 1024 } // 95MB per chunk - safely under Cloudflare's 100MB limit
+});
+
 const router = Router();
 
-// ---- File type detection ----
+// ======================================================================
+// Shared helpers
+// ======================================================================
+
 function getFileType(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   if (ext === '.pdf') return 'pdf';
@@ -165,14 +191,12 @@ async function extractCbrImages(cbrPath, outputDir) {
     }
   }
 
-  // Check if any files made it out
   try {
     const files = fs.readdirSync(nativeExtractDir);
     if (files.length > 0) {
       const paths = processExtractedFiles(nativeExtractDir, outputDir);
       if (paths.length > 0) return paths;
 
-      // Identify extensions present but rejected
       const allExts = [...new Set(files.map(f => path.extname(f).toLowerCase()))];
       errors.push(`[Native Reader]: Files extracted, but no valid images found! Extensions present: ${allExts.join(', ')}`);
     } else {
@@ -230,29 +254,23 @@ function isDoubleSpread(width, height, medianRatio) {
   return (width / height) > medianRatio * 1.3;
 }
 
-router.post('/', authenticate, upload.single('file'), async (req, res) => {
-  if (!req.isAdmin) {
-    // Also clean up the temp file if not admin
-    if (req.file?.path) fs.rmSync(req.file.path, { force: true });
-    return res.status(403).json({ error: 'Only administrators can upload comics' });
-  }
+// ======================================================================
+// Shared processing logic — used by both single & chunked uploads
+// ======================================================================
 
+async function processUploadedFile({ filePath, fileName, seriesTitle, seriesId, category, issueNumber, issueTitle, description, userId }) {
   const tempDir = path.join(TEMP_DIR, `job-${Date.now()}`);
   fs.mkdirSync(tempDir, { recursive: true });
 
   try {
-    const { seriesTitle, seriesId, category, issueNumber, issueTitle, description, userId } = req.body;
-
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-    if (!userId) return res.status(400).json({ error: 'User ID is required' });
-
-    const fileType = getFileType(req.file.originalname);
-    if (fileType === 'unknown') return res.status(400).json({ error: 'Unsupported file type' });
+    const fileType = getFileType(fileName);
+    if (fileType === 'unknown') throw new Error('Unsupported file type');
+    if (!userId) throw new Error('User ID is required');
 
     // Create or get series
     let finalSeriesId = seriesId;
     if (!seriesId || seriesId === 'new') {
-      if (!seriesTitle) return res.status(400).json({ error: 'Series title required' });
+      if (!seriesTitle) throw new Error('Series title required');
 
       finalSeriesId = crypto.randomUUID();
       db.prepare(`
@@ -269,9 +287,9 @@ router.post('/', authenticate, upload.single('file'), async (req, res) => {
     `).run(issueId, finalSeriesId, parseInt(issueNumber) || 1, issueTitle || '');
 
     // Extract/convert source images
-    const sourceImages = await getSourceImages(req.file.path, fileType, tempDir);
+    const sourceImages = await getSourceImages(filePath, fileType, tempDir);
 
-    // Process and upload each page to R2
+    // Process and save each page
     const pageData = [];
     for (let i = 0; i < sourceImages.length; i++) {
       const srcPath = sourceImages[i];
@@ -316,7 +334,7 @@ router.post('/', authenticate, upload.single('file'), async (req, res) => {
     // Update issue page count
     db.prepare('UPDATE issues SET page_count = ? WHERE id = ?').run(pageData.length, issueId);
 
-    // Generate and upload cover
+    // Generate and save cover
     if (sourceImages.length > 0) {
       const coverBuffer = await sharp(sourceImages[0])
         .resize(400, 600, { fit: 'cover' })
@@ -324,35 +342,143 @@ router.post('/', authenticate, upload.single('file'), async (req, res) => {
         .toBuffer();
 
       const coverKey = `${userId}/covers/${finalSeriesId}.webp`;
-      const fullPath = path.join(IMAGES_DIR, coverKey);
-      fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-      fs.writeFileSync(fullPath, coverBuffer);
+      const coverFullPath = path.join(IMAGES_DIR, coverKey);
+      fs.mkdirSync(path.dirname(coverFullPath), { recursive: true });
+      fs.writeFileSync(coverFullPath, coverBuffer);
 
-      // Only set cover if series doesn't have one
       const currentSeries = db.prepare('SELECT cover_url FROM series WHERE id = ?').get(finalSeriesId);
-
       if (!currentSeries?.cover_url) {
         db.prepare('UPDATE series SET cover_url = ? WHERE id = ?').run(coverKey, finalSeriesId);
       }
     }
 
-    // Clean up temp files
+    // Clean up
     fs.rmSync(tempDir, { recursive: true, force: true });
-    if (req.file.path) fs.rmSync(req.file.path, { force: true });
+    fs.rmSync(filePath, { force: true });
 
-    res.json({
+    return {
       success: true,
       seriesId: finalSeriesId,
       issueId,
       pageCount: pageData.length,
       message: `Uploaded ${pageData.length} pages (${fileType.toUpperCase()})`
-    });
+    };
 
   } catch (error) {
-    console.error('Upload error:', error);
-    // Clean up temp files on error
     fs.rmSync(tempDir, { recursive: true, force: true });
+    fs.rmSync(filePath, { force: true });
+    throw error;
+  }
+}
+
+// ======================================================================
+// Routes
+// ======================================================================
+
+// ---- Single-file upload (original, works for files < 100MB through Cloudflare) ----
+router.post('/', authenticate, upload.single('file'), async (req, res) => {
+  if (!req.isAdmin) {
     if (req.file?.path) fs.rmSync(req.file.path, { force: true });
+    return res.status(403).json({ error: 'Only administrators can upload comics' });
+  }
+
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+  try {
+    const result = await processUploadedFile({
+      filePath: req.file.path,
+      fileName: req.file.originalname,
+      ...req.body
+    });
+    res.json(result);
+  } catch (error) {
+    console.error('Upload error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ---- Chunked upload: receive a single chunk ----
+router.post('/chunk', authenticate, chunkUpload.single('chunk'), (req, res) => {
+  if (!req.isAdmin) {
+    if (req.file?.path) fs.rmSync(req.file.path, { force: true });
+    return res.status(403).json({ error: 'Only administrators can upload comics' });
+  }
+
+  const { uploadId, chunkIndex, totalChunks } = req.body;
+  if (!uploadId || chunkIndex === undefined || !totalChunks) {
+    return res.status(400).json({ error: 'Missing chunk metadata (uploadId, chunkIndex, totalChunks)' });
+  }
+
+  res.json({
+    success: true,
+    chunkIndex: parseInt(chunkIndex),
+    totalChunks: parseInt(totalChunks)
+  });
+});
+
+// ---- Chunked upload: reassemble and process ----
+router.post('/complete', authenticate, async (req, res) => {
+  if (!req.isAdmin) {
+    return res.status(403).json({ error: 'Only administrators can upload comics' });
+  }
+
+  const { uploadId, fileName, totalChunks, seriesTitle, seriesId, category, issueNumber, issueTitle, description, userId } = req.body;
+
+  if (!uploadId || !fileName || !userId) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  const chunkDir = path.join(TEMP_DIR, `chunks-${uploadId}`);
+
+  if (!fs.existsSync(chunkDir)) {
+    return res.status(400).json({ error: 'No chunks found for this upload. Please re-upload.' });
+  }
+
+  try {
+    // Reassemble chunks into a single file
+    const chunks = fs.readdirSync(chunkDir)
+      .filter(f => f.startsWith('chunk-'))
+      .sort();
+
+    if (totalChunks && chunks.length !== parseInt(totalChunks)) {
+      throw new Error(`Expected ${totalChunks} chunks but found ${chunks.length}. Upload may be incomplete.`);
+    }
+
+    const assembledPath = path.join(TEMP_DIR, `${uploadId}-${fileName}`);
+    const writeStream = fs.createWriteStream(assembledPath);
+
+    for (const chunkFile of chunks) {
+      const chunkData = fs.readFileSync(path.join(chunkDir, chunkFile));
+      writeStream.write(chunkData);
+    }
+
+    await new Promise((resolve, reject) => {
+      writeStream.on('finish', resolve);
+      writeStream.on('error', reject);
+      writeStream.end();
+    });
+
+    // Clean up chunk directory
+    fs.rmSync(chunkDir, { recursive: true, force: true });
+
+    // Process the reassembled file
+    const result = await processUploadedFile({
+      filePath: assembledPath,
+      fileName,
+      seriesTitle,
+      seriesId,
+      category,
+      issueNumber,
+      issueTitle,
+      description,
+      userId
+    });
+
+    res.json(result);
+
+  } catch (error) {
+    console.error('Chunked upload complete error:', error);
+    fs.rmSync(chunkDir, { recursive: true, force: true });
     res.status(500).json({ error: error.message });
   }
 });

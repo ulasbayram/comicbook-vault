@@ -37,7 +37,7 @@ function SeriesDetail({ session }) {
         fetch(`/api/images/cover/${id}`)
           .then(r => r.json())
           .then(data => setCoverUrl(data.url))
-          .catch(() => {});
+          .catch(() => { });
       }
 
       // Get issues with reading progress from backend
@@ -179,17 +179,17 @@ function SeriesDetail({ session }) {
                 <div className="issue-info" style={{ flex: 1 }}>
                   {editingIssueId === issue.id ? (
                     <div className="edit-issue-form" onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
-                      <input 
-                        type="number" 
-                        value={editForm.issueNumber} 
-                        onChange={e => setEditForm({...editForm, issueNumber: e.target.value})}
+                      <input
+                        type="number"
+                        value={editForm.issueNumber}
+                        onChange={e => setEditForm({ ...editForm, issueNumber: e.target.value })}
                         style={{ width: '60px', padding: '4px', borderRadius: '4px', border: '1px solid #ccc', background: '#222', color: 'white' }}
                       />
-                      <input 
-                        type="text" 
-                        value={editForm.title} 
+                      <input
+                        type="text"
+                        value={editForm.title}
                         placeholder="Issue Title"
-                        onChange={e => setEditForm({...editForm, title: e.target.value})}
+                        onChange={e => setEditForm({ ...editForm, title: e.target.value })}
                         style={{ flex: 1, padding: '4px', borderRadius: '4px', border: '1px solid #ccc', background: '#222', color: 'white' }}
                         autoFocus
                       />
